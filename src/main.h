@@ -1,3 +1,5 @@
+#include "solver_globals.h"
+#include "calculate_loadbalance.h"
 #include <stdio.h>
 #include <complex>
 #include <chrono>
@@ -32,7 +34,9 @@ complex<double> *source_DG;
 double *source_dipole;
 double source_PW[4];
 double *dir_PW;
-int *num_source=new int[2];
+// Source counts have static ownership; num_source is a borrowed view.
+int num_source_storage[2]{};
+int *num_source=num_source_storage;
 int val_pol;
 int parallel_omp_on;
 int num_threads;
@@ -95,8 +99,6 @@ int *boxes_far;
 int *boxes_near;
 
 // created in calculate_loadbalance
-int *thread_boxes;
-int *thread_boxes_Rad;
 
 // created in generate_Znearcomponent
 long int *nearindex;
@@ -129,10 +131,8 @@ complex<double> *matrix_Znear21;
 complex<double> *matrix_Znear22;
 
 // created in calculate_blockdiagonalpreconditioner
-matrixBlock* blockdiagonalmatrix11;
-matrixBlock* blockdiagonalmatrix12;
-matrixBlock* blockdiagonalmatrix21;
-matrixBlock* blockdiagonalmatrix22;
+matrixBlock* blockdiagonalmatrix11 = nullptr;
+matrixBlock* blockdiagonalmatrix22 = nullptr;
 
 // created in calculate_rhsvector
 complex<double> *vec_RHS;
@@ -167,7 +167,7 @@ void calculate_blockdiagonalpreconditioner();
 void mvm_Zneardotx();
 void mvm_Zfardotx();
 
-void stage_solution();
+int stage_solution();
 void stage_aftersolution();
 
 void clear_memory();

@@ -1,89 +1,68 @@
-#include <stdio.h>
+#include "calculate_loadbalance.h"
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
 
-using namespace std;
-
-extern int parallel_omp_on;
 extern int num_threads;
 extern int *num_filledboxes;
 extern int num_mlfmalevels;
-extern int *thread_boxes;
-extern int *thread_boxes_Rad;
+extern int *num_children;
+extern int *boxes_near;
 extern long int size_Znear;
-extern long int *nearindex;
-extern int num_rwgs;
-extern int *children;
+
+namespace {
+// Geometry-dependent weights are immutable throughout assembly and solution.
+std::vector<std::uint64_t> near_work_prefix;
+int first_leaf_box;
+
+int partition_boundary(int worker, int team_size){
+    const int box_count=static_cast<int>(near_work_prefix.size())-1;
+    if(worker==0) return first_leaf_box;
+    if(worker==team_size) return first_leaf_box+box_count;
+
+    const std::uint64_t total=near_work_prefix.back();
+    if(total==0){
+        return first_leaf_box+static_cast<int>(std::uint64_t(box_count)*worker/team_size);
+    }
+    // floor(total*worker/team_size), avoiding overflow of total*worker.
+    const std::uint64_t target=(total/team_size)*worker
+        +((total%team_size)*worker)/team_size;
+    const auto boundary=std::lower_bound(near_work_prefix.begin(),near_work_prefix.end(),target);
+    return first_leaf_box+static_cast<int>(boundary-near_work_prefix.begin());
+}
+}
 
 void calculate_loadbalance(){
-
-    // Load balance operation is performed by calculating average number of interactions per thread
-    // Each load is parsed in test boxes in Znear MVM
-
-    long int thread_load=size_Znear/long(num_threads);
-    int thread_id=1;
-
-    int box_start=num_filledboxes[num_mlfmalevels*2-1];
-    int box_end=num_filledboxes[num_mlfmalevels*3-1]+1;
-
-    thread_boxes=new int[num_threads*2];
-    thread_boxes[0]=box_start;
-    thread_boxes[num_threads*2-1]=box_end;
-
-    for(int box_test=box_start;box_test<box_end;box_test++){
-        long int ind_Znear=nearindex[(box_test-box_start)*27];
-        if (ind_Znear>=(thread_id*thread_load)){
-            thread_boxes[thread_id*2+0]=box_test;
-            thread_boxes[(thread_id-1)*2+1]=box_test;
-            thread_id++;
-        }
+    if(num_threads<=0){
+        std::fprintf(stderr,"Invalid thread count: %d; expected a positive integer.\n",num_threads);
+        std::exit(EXIT_FAILURE);
     }
-
-
-
-    int thread_load_rad=num_rwgs/num_threads;
-    thread_id=1;
-
-    thread_boxes_Rad=new int[num_threads*2];
-    thread_boxes_Rad[0]=box_start;
-    thread_boxes_Rad[num_threads*2-1]=box_end;
-    int ind_box_rwgs=0;
-    for(int box_basis=box_start;box_basis<box_end;box_basis++){
-        int start_basis=children[box_basis*2+0];
-        int end_basis=children[box_basis*2+1]+1;
-        ind_box_rwgs+=(end_basis-start_basis);
-        if (ind_box_rwgs>=(thread_id*thread_load_rad)){
-            thread_boxes_Rad[thread_id*2+0]=box_basis;
-            thread_boxes_Rad[(thread_id-1)*2+1]=box_basis;
-            thread_id++;
+    first_leaf_box=num_filledboxes[num_mlfmalevels*2-1];
+    const int end_box=num_filledboxes[num_mlfmalevels*3-1]+1;
+    near_work_prefix.assign(end_box-first_leaf_box+1,0);
+    for(int box=first_leaf_box;box<end_box;++box){
+        std::uint64_t work=0;
+        for(int neighbor=0;neighbor<27;++neighbor){
+            const int basis_box=boxes_near[box*27+neighbor];
+            if(basis_box!=-1){
+                work+=std::uint64_t(num_children[box])*std::uint64_t(num_children[basis_box]);
+            }
         }
-
+        const int index=box-first_leaf_box;
+        near_work_prefix[index+1]=near_work_prefix[index]+work;
     }
+    assert(near_work_prefix.back()==std::uint64_t(size_Znear));
+}
 
-
-
-//    int box_start=num_filledboxes[num_mlfmalevels*2-1];
-//    int box_end=num_filledboxes[num_mlfmalevels*3-1]+1;
-//    long int thread_load=(box_end-box_start+1)/long(num_threads);
-//    int thread_id=1;
-//
-//    thread_boxes=new int[num_threads*2];
-//    thread_boxes[0]=box_start;
-//    thread_boxes[num_threads*2-1]=box_end;
-//
-//    for(int box_test=box_start;box_test<box_end;box_test++){
-//        if ((box_test-box_start+1)>=(thread_load*thread_id)){
-//            thread_boxes[thread_id*2+0]=box_test;
-//            thread_boxes[(thread_id-1)*2+1]=box_test;
-//            thread_id++;
-//        }
-//    }
-
-
-
-
-//    for(int tid=0; tid<num_threads; tid++){
-//        printf("Thread ID: %d, Start Box: %d, End Box: %d, Znear Index: %ld \n", tid, thread_boxes[tid*2+0], thread_boxes[tid*2+1], nearindex[(thread_boxes[tid*2+0]-box_start)*27]);
-//        printf("Thread ID: %d, Start Box: %d, End Box: %d, Number of Box: %d \n \n", tid, thread_boxes_Rad[tid*2+0], thread_boxes_Rad[tid*2+1], thread_boxes_Rad[tid*2+1]-thread_boxes_Rad[tid*2+0] );
-//    }
-//    printf("\n");
-
+std::pair<int,int> near_box_range(int thread_id,int team_size){
+    assert(!near_work_prefix.empty());
+    assert(team_size>0 && thread_id>=0 && thread_id<team_size);
+    const int begin=partition_boundary(thread_id,team_size);
+    const int end=partition_boundary(thread_id+1,team_size);
+    assert(first_leaf_box<=begin && begin<=end);
+    assert(end<=first_leaf_box+static_cast<int>(near_work_prefix.size())-1);
+    return {begin,end};
 }

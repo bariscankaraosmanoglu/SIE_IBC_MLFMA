@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "input_validation.h"
 using namespace std;
 
 extern double pi;
@@ -9,6 +10,10 @@ void interpolationweights(int num_coarsesample,int num_finesample,int num_interp
     // interpolationweights
     // Lagrange interpolation weights and index locations
 
+    try {
+        validate_interpolation_dimensions(num_coarsesample,num_finesample,num_interpolpoint);
+        require_input(flagphitheta==0 || flagphitheta==1,"num_interpol","invalid theta/phi selector");
+    } catch (const InputError& error) { report_input_error(error); }
     double *loc_coarse_ex;
     loc_coarse_ex=new double[3*num_coarsesample];
 
@@ -29,7 +34,7 @@ void interpolationweights(int num_coarsesample,int num_finesample,int num_interp
 
     for(int ind_fine=0;ind_fine<num_finesample;ind_fine++){
         int ind_coarse=0;
-        while((loc_coarse_ex[ind_coarse+num_coarsesample]<loc_fine[ind_fine])&&(ind_coarse<=num_coarsesample)){
+        while((ind_coarse<num_coarsesample)&&(loc_coarse_ex[ind_coarse+num_coarsesample]<loc_fine[ind_fine])){
             ind_coarse++;
         }
         int ind_coarse_start=ind_coarse+num_coarsesample-num_interpolpoint;

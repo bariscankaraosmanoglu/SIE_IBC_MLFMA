@@ -207,9 +207,9 @@ void calculate_farfield(int ind_sol){
                  abs(vec_farfield[ind*2+1]), arg(vec_farfield[ind*2+1]));
     }
     fclose(fptr);
-    delete[] ffdir_theta;
-    delete[] ffdir_phi;
-    delete[] vec_farfield;
+    delete[] ffdir_theta; ffdir_theta = nullptr;
+    delete[] ffdir_phi; ffdir_phi = nullptr;
+    delete[] vec_farfield; vec_farfield = nullptr;
 
 
     std::cout.flush();

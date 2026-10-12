@@ -18,11 +18,11 @@ extern int *trans_index;
 extern int *trans_index_pc;
 extern int size_trans;
 extern int size_trans_pc;
+extern double val_approx;
 extern int val_pc;
 extern int parallel_omp_on;
 extern int num_threads;
 extern FILE *file_timer;
-extern double val_approx;
 
 void phi_locations_weights(int , double*, double*);
 void theta_locations_weights(int , double*, double*);

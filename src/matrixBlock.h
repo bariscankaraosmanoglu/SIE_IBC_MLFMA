@@ -1,53 +1,29 @@
+#ifndef MATRIXBLOCK_H
+#define MATRIXBLOCK_H
+#define MLFMA_PIVOTED_BLOCK_LU 1
 #include <complex>
+#include <vector>
 
-using namespace std;
+// Owned self-block factors and RWG maps. No symmetry/Hermitian assumption.
+class matrixBlock {
+public:
+    int sizerow = 0;
+    int sizecol = 0;
+    std::vector<int> indrows, indcols;
+    std::vector<std::complex<double>> factors;
+    std::vector<int> pivots;
 
-class matrixBlock{
-    public:
-    int sizerow;
-    int sizecol;
-    int* indrows;
-    int* indcols;
-    complex<double>** submatrix;
-
-    //class constructor with null elements
-    matrixBlock(){} 
-        
-    //initialization of sizerow and allocation of submatrix
-    void initmatrixBlock(int matsizerow, int matsizecol){
-        sizerow=matsizerow;
-        sizecol=matsizecol;
-        indrows = new int[sizerow];
-        indcols = new int[sizecol];
-        submatrix = new complex<double>*[sizerow];
-        for(int i=0; i<sizerow; i++){
-            submatrix[i]=new complex<double>[sizecol];
-        }
-    }
-
-    //initialization of submatrix
-    void initsubmatrix(complex<double> initval){
-        for(int i=0;i<sizerow; i++){
-            for(int j=0;j<sizecol; j++){
-                submatrix[i][j]=initval;
-            }
-        }
-    }
-
-    //assign value to submatrix
-    void assignvalue(int indcol, int indrow, complex<double> value){
-        submatrix[indcol][indrow]=value;
-    }
-
-    //class destructor
-    ~matrixBlock(){
-        //printf("Deleting matrixBlock\n"); 
-        delete[] indrows;
-        delete[] indcols;
-        for(int i=0; i<sizerow; i++){
-            delete[] submatrix[i];
-        }
-        delete[] submatrix;
-    }
-
+    matrixBlock() = default;
+    matrixBlock(const matrixBlock&) = delete;
+    matrixBlock& operator=(const matrixBlock&) = delete;
+    matrixBlock(matrixBlock&&) = default;
+    matrixBlock& operator=(matrixBlock&&) = default;
+    void initmatrixBlock(int rows, int columns);
+    void assignvalue(int row, int column, std::complex<double> value);
+    void factorize();
+    void solve_inplace(std::complex<double>* rhs) const;
+    bool ready() const { return factorized_; }
+private:
+    bool factorized_ = false;
 };
+#endif

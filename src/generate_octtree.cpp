@@ -1,6 +1,13 @@
+#include "mlfma_workspace.h"
 #include "generate_octtree.h"
+#include "input_validation.h"
+#include <climits>
 
 void generate_octtree(){
+    // A new tree starts a new sampling/workspace lifetime.
+    mlfma_workspace().clear();
+    try {
+    require_input(num_rwgs > 0, "RWG", "mesh has no full RWG unknowns; isolated triangles are unsupported by this discretization");
     //
     //
     // generate_octtree
@@ -46,6 +53,9 @@ void generate_octtree(){
     objectcenter[0]=(objectmax[0]+objectmin[0])/2;
     objectcenter[1]=(objectmax[1]+objectmin[1])/2;
     objectcenter[2]=(objectmax[2]+objectmin[2])/2;
+    for (int axis=0; axis<3; ++axis)
+        require_input(std::isfinite(objectcenter[axis]) && std::isfinite(objectmax[axis]-objectmin[axis]),
+                      "POINTS", "bounding box is not representable");
     objectsize=0.0;
     for(int ind1=0; ind1<3; ind1++){
         if(objectsize<(objectmax[ind1]-objectmin[ind1]))
@@ -57,42 +67,29 @@ void generate_octtree(){
     printf("Model Size: %f \n", objectsize);
     printf("\n");
 
-    // Determine the number of MLFMA levels for the simulation.
-    if(num_mlfmalevels==1){
-        num_mlfmalevels=floor(log2(objectsize/val_lambdaO))+3;
-        if(num_mlfmalevels<2){
-                num_mlfmalevels=2;
-        }
-    }
+    // Resolve and validate every dimension before allocating tree/operator arrays.
+    extern int num_interpol;
+    extern double dir_ff;
+    const MlfmaDimensions dimensions = validate_mlfma_dimensions(num_mlfmalevels,
+        objectsize,val_lambdaO,val_kO,num_digits,val_pc,val_approx,num_interpol,dir_ff);
+    num_mlfmalevels=dimensions.levels;
     printf("MLFMA Levels: %d \n", num_mlfmalevels);
-
-    // Calculate the required box sizes at each MLFMA level.
     size_boxes=new double[num_mlfmalevels];
-    size_boxes[0]=objectsize;
-    for(int ind1=1; ind1<num_mlfmalevels; ind1++)
-        size_boxes[ind1]=size_boxes[ind1-1]/2;
-    double smallestboxsize=size_boxes[num_mlfmalevels-1];
-    boxmin[0]=objectcenter[0]-objectsize/2;
-    boxmin[1]=objectcenter[1]-objectsize/2;
-    boxmin[2]=objectcenter[2]-objectsize/2;
-
-    // Calculate the required truncation numbers (number of harmonics) at each MLFMA level.
     num_truncation=new int[num_mlfmalevels];
-    for(int ind1=0; ind1<num_mlfmalevels; ind1++){
-        num_truncation[ind1]=ceil((1.73*abs(val_kO)*size_boxes[ind1]+2.16*(pow(num_digits,0.666666666666666))*pow(abs(val_kO)*size_boxes[ind1],0.333333333333333)));
-        printf("Level: %d, Num. Harmonics: %d \n", ind1, num_truncation[ind1]);
+    for(int level=0;level<num_mlfmalevels;++level) {
+        size_boxes[level]=dimensions.boxes[level];
+        num_truncation[level]=dimensions.terms[level];
+        printf("Level: %d, Num. Harmonics: %d \n",level,num_truncation[level]);
     }
-
-    if(val_pc==2){
+    const double smallestboxsize=size_boxes[num_mlfmalevels-1];
+    for(int axis=0;axis<3;++axis) boxmin[axis]=objectcenter[axis]-objectsize/2;
+    if(val_pc==2) {
         num_truncation_pc=new int[num_mlfmalevels];
-        num_truncation_pc[num_mlfmalevels-1]=num_truncation[num_mlfmalevels-1];
-        for(int ind1=0; ind1<num_mlfmalevels; ind1++){
-            //num_truncation_pc[ind1]=val_approx*(num_truncation[ind1])+(1-val_approx)*num_truncation[num_mlfmalevels-1];
-            num_truncation_pc[ind1]=val_approx*(num_truncation[ind1]);
-            printf("Level: %d, Num. Harmonics PC: %d \n", ind1, num_truncation_pc[ind1]);
+        for(int level=0;level<num_mlfmalevels;++level) {
+            num_truncation_pc[level]=dimensions.approximate_terms[level];
+            printf("Level: %d, Num. Harmonics PC: %d \n",level,num_truncation_pc[level]);
         }
     }
-
 
     // Calculate RWG location indices at the least level boxes. Storing the variables in XYZ coordinates and in combined-form.
     // The RWG box location indices are sorted for the calculation of box locations at the higher levels.
@@ -193,7 +190,7 @@ void generate_octtree(){
                 num_filledboxes[indlev]++;
             }
         }
-        num_filledboxesall+=num_filledboxes[indlev];
+        num_filledboxesall=checked_index_sum(num_filledboxesall,num_filledboxes[indlev],INT_MAX/189,"num_mlfmalevels box indices");
         for(int indrwg=0; indrwg<num_rwgs; indrwg++){
             rwglocationsTemp[indrwg]/=8;
         }
@@ -328,8 +325,8 @@ void generate_octtree(){
     printf("\n");
 
     std::cout.flush();
-
-
+    } catch (const InputError& error) { report_input_error(error); }
+      catch (const std::bad_alloc&) { report_input_error(InputError("num_mlfmalevels", "unable to allocate tree storage")); }
 
 }
 

@@ -1,3 +1,4 @@
+#include "solver_globals.h"
 #include <stdio.h>
 #include <cmath>
 #include <complex>
@@ -42,7 +43,6 @@ extern int *tri2rwgnode;
 extern int *tri2rwgsign;
 extern int parallel_omp_on;
 extern int num_threads;
-extern int *thread_boxes;
 extern FILE *file_timer;
 
 

@@ -44,6 +44,15 @@ void theta_locations_weights(int num_sample_theta, double *weights_theta, double
     }
 }
 
+void theta_locations_weights_lin(int num_sample_theta, double *weights_theta, double *locs_theta){
+    // theta_locations_weights_lin
+    // Linearly Sampled Points and Weights
+    for(int indtheta=0; indtheta<num_sample_theta; indtheta++){
+        weights_theta[indtheta]=pi/num_sample_theta;
+        locs_theta[indtheta]=pi/(num_sample_theta-1)*indtheta;
+    }
+}
+
 void calculate_sin_cos(int num_thetas, int num_phis, double *thetas, double *phis, double *sintheta, double *costheta, double *sinphi, double *cosphi){
 
     for(int indtheta=0; indtheta<num_thetas; indtheta++){

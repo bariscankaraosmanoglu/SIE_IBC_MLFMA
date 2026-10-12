@@ -1,6 +1,10 @@
 #include "generate_translationcomponent.h"
+#include "input_validation.h"
+#include <climits>
+#include <vector>
 
 void generate_translationcomponent(){
+    try {
     //
     //
     // generate_translationcomponent
@@ -29,7 +33,7 @@ void generate_translationcomponent(){
                     int indexval=indlev*343+delta[0]*49+delta[1]*7+delta[2];
                     if(trans_index[indexval]==-1){
                         trans_index[indexval]=size_trans;
-                        size_trans+=2*(num_truncation[indlev]+1)*(num_truncation[indlev]+1);
+                        size_trans=checked_index_sum(size_trans,2L*(num_truncation[indlev]+1)*(num_truncation[indlev]+1),INT_MAX,"translation");
                     }
                 }
             }
@@ -60,7 +64,7 @@ void generate_translationcomponent(){
                         int indexval=indlev*343+delta[0]*49+delta[1]*7+delta[2];
                         if(trans_index_pc[indexval]==-1){
                             trans_index_pc[indexval]=size_trans_pc;
-                            size_trans_pc+=2*(num_truncation_pc[indlev]+1)*(num_truncation_pc[indlev]+1);
+                            size_trans_pc=checked_index_sum(size_trans_pc,2L*(num_truncation_pc[indlev]+1)*(num_truncation_pc[indlev]+1),INT_MAX,"translation");
                         }
                     }
                 }
@@ -69,6 +73,8 @@ void generate_translationcomponent(){
     }
 
 
+    } catch (const InputError& error) { report_input_error(error); }
+      catch (const std::bad_alloc&) { report_input_error(InputError("translation","unable to allocate index storage")); }
 }
 
 

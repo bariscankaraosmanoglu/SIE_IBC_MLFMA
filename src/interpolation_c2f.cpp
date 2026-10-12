@@ -1,8 +1,9 @@
+#include "mlfma_workspace.h"
 #include <stdio.h>
 #include <complex>
 using namespace std;
 
-void interpolation_c2f(int num_coarsesample_theta,int num_coarsesample_phi,int num_finesample_theta,int num_finesample_phi,int num_interpolpoint,int *indexloc_theta,int *indexloc_phi,double *inter_weights_theta,double *inter_weights_phi,complex<double> *field_coarse,complex<double> *field_fine){
+void interpolation_c2f(int num_coarsesample_theta,int num_coarsesample_phi,int num_finesample_theta,int num_finesample_phi,int num_interpolpoint,int *indexloc_theta,int *indexloc_phi,double *inter_weights_theta,double *inter_weights_phi,complex<double> *field_coarse,complex<double> *field_fine,InterpolationScratch& scratch){
     //
     //
     // interpolation_c2f
@@ -12,9 +13,10 @@ void interpolation_c2f(int num_coarsesample_theta,int num_coarsesample_phi,int n
     complex<double> *sample_inflated_theta;
     complex<double> *field_fine_half;
     complex<double> *sample_inflated_phi;
-    sample_inflated_theta=new complex<double>[3*num_coarsesample_theta*num_coarsesample_phi];
-    field_fine_half=new complex<double>[num_finesample_theta*num_coarsesample_phi];
-    sample_inflated_phi=new complex<double>[num_finesample_theta*num_coarsesample_phi*3];
+    scratch.prepare(num_coarsesample_theta,num_coarsesample_phi,num_finesample_theta);
+    sample_inflated_theta = scratch.inflated_theta.data();
+    field_fine_half = scratch.half.data();
+    sample_inflated_phi = scratch.inflated_phi.data();
 
 
     // Preprocess part for interpolation on theta direction
@@ -95,9 +97,6 @@ void interpolation_c2f(int num_coarsesample_theta,int num_coarsesample_phi,int n
         }
     }
 
-    delete[] sample_inflated_theta;
-    delete[] field_fine_half;
-    delete[] sample_inflated_phi;
 
 
 }
@@ -107,3 +106,8 @@ void interpolation_c2f(int num_coarsesample_theta,int num_coarsesample_phi,int n
 
 
 
+
+void interpolation_c2f(int num_coarsesample_theta,int num_coarsesample_phi,int num_finesample_theta,int num_finesample_phi,int num_interpolpoint,int *indexloc_theta,int *indexloc_phi,double *inter_weights_theta,double *inter_weights_phi,complex<double> *field_coarse,complex<double> *field_fine){
+    InterpolationScratch scratch;
+    interpolation_c2f(num_coarsesample_theta,num_coarsesample_phi,num_finesample_theta,num_finesample_phi,num_interpolpoint,indexloc_theta,indexloc_phi,inter_weights_theta,inter_weights_phi,field_coarse,field_fine,scratch);
+}
