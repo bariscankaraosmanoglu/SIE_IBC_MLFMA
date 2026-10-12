@@ -1,0 +1,4 @@
+rm run_mlfma 
+g++ -Wall -fexceptions -O3 -std=gnu++17 src/*.cpp -o run_mlfma
+
+g++ -Wall -fexceptions -O3 -std=gnu++17 -fopenmp src/*.cpp -o run_mlfma

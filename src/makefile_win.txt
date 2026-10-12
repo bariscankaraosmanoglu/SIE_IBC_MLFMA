@@ -1,0 +1,37 @@
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c calculate_farfield.cpp -o objs\calculate_farfield.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c calculate_RadRecPatterns.cpp -o objs\calculate_RadRecPatterns.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c calculate_rhsvector.cpp -o objs\calculate_rhsvector.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c calculate_translationoperator.cpp -o objs\calculate_translationoperator.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c calculate_Znearmatrix.cpp -o objs\calculate_Znearmatrix.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c clear_memory.cpp -o objs\clear_memory.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c fgmres.cpp -o objs\fgmres.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c fgmres_in.cpp -o objs\fgmres_in.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c generate_edgeconnection.cpp -o objs\generate_edgeconnection.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c generate_nearfarboxes.cpp -o objs\generate_nearfarboxes.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c generate_octtree.cpp -o objs\generate_octtree.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c generate_translationcomponent.cpp -o objs\generate_translationcomponent.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c generate_Zfarcomponents.cpp -o objs\generate_Zfarcomponents.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c generate_Znearcomponent.cpp -o objs\generate_Znearcomponent.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c genetare_constants.cpp -o objs\genetare_constants.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c interpolation_c2f.cpp -o objs\interpolation_c2f.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c interpolation_f2c.cpp -o objs\interpolation_f2c.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c interpolationweights.cpp -o objs\interpolationweights.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c main.cpp -o objs\main.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c miscellaneous_operations.cpp -o objs\miscellaneous_operations.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c mvm.cpp -o objs\mvm.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c mvm_in.cpp -o objs\mvm_in.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c mvm_Zfardotx.cpp -o objs\mvm_Zfardotx.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c mvm_Zfardotx_in.cpp -o objs\mvm_Zfardotx_in.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c mvm_Zneardotx.cpp -o objs\mvm_Zneardotx.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c pc_solution.cpp -o objs\pc_solution.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c pc_solution_in.cpp -o objs\pc_solution_in.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c quadrature_points.cpp -o objs\quadrature_points.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c read_meshmodel.cpp -o objs\read_meshmodel.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c read_simulationinput.cpp -o objs\read_simulationinput.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c sample_locations_weights.cpp -o objs\sample_locations_weights.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c stage_aftersolution.cpp -o objs\stage_aftersolution.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c stage_solution.cpp -o objs\stage_solution.o
+g++.exe -Wall -fexceptions  -O3 -std=gnu++17 -fopenmp  -c tri_analytical_int.cpp -o objs\tri_analytical_int.o
+g++.exe  -o bin\Release\codedev_bck_mlfma_v1p5.exe objs\calculate_farfield.o objs\calculate_RadRecPatterns.o objs\calculate_rhsvector.o objs\calculate_translationoperator.o objs\calculate_Znearmatrix.o objs\clear_memory.o objs\fgmres.o objs\fgmres_in.o objs\generate_edgeconnection.o objs\generate_nearfarboxes.o objs\generate_octtree.o objs\generate_translationcomponent.o objs\generate_Zfarcomponents.o objs\generate_Znearcomponent.o objs\genetare_constants.o objs\interpolation_c2f.o objs\interpolation_f2c.o objs\interpolationweights.o objs\main.o objs\miscellaneous_operations.o objs\mvm.o objs\mvm_in.o objs\mvm_Zfardotx.o objs\mvm_Zfardotx_in.o objs\mvm_Zneardotx.o objs\pc_solution.o objs\pc_solution_in.o objs\quadrature_points.o objs\read_meshmodel.o objs\read_simulationinput.o objs\sample_locations_weights.o objs\stage_aftersolution.o objs\stage_solution.o objs\tri_analytical_int.o  -s -O3 -lgomp -pthread  "C:\Program Files\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\lib\gcc\x86_64-w64-mingw32\8.1.0\libgomp.a"
+
+
