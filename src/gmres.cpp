@@ -1,326 +1,126 @@
-#include <stdio.h>
-#include <complex>
+#include "krylov_internal.h"
+#include <algorithm>
 #include <cmath>
-#include <omp.h>
-#include <iostream>
-#include <unistd.h>
+#include <cstdio>
+#include <new>
+#include <stdexcept>
 
-using namespace std;
+using namespace krylov_detail;
+void mvm(Complex*, Complex*);
+void mvm_in(Complex*, Complex*);
+void mvm_Zneardotx(Complex*, Complex*);
 
-extern int parallel_omp_on;
+namespace {
+Complex phase(Complex value) {
+    return value == Complex{} ? Complex{1.0} : value/std::abs(value);
+}
+void reflect(const Complex* q, Complex* v, int n) {
+    const Complex projection = 2.0*dot(q, v, n);
+    for (int k = 0; k < n; ++k) v[k] -= q[k]*projection;
+}
+void reflector(const Complex* v, Complex* q, int first, int n, double norm) {
+    std::fill_n(q, n, Complex{});
+    // Normalize before adding the phase to avoid v[first] + phase*norm overflow.
+    for (int k = first; k < n; ++k) q[k] = v[k]/norm;
+    q[first] += phase(v[first]);
+    const double qnorm = krylov_norm(q, n);
+    for (int k = first; k < n; ++k) q[k] /= qnorm;
+}
+}
 
-void mvm(complex<double> x[], complex<double> y[]);
-void mvm_in(complex<double> x[], complex<double> y[]);
-void mvm_Zneardotx(complex<double> x[], complex<double> y[]);
-double LANORM(complex<double> vec_in[],int size_vec);
-void cleartozero(complex<double> vec_in[],int size_vec);
-void destructor2D(complex<double> **data_in, int num_row, int num_col);
-complex<double> ** constructor2D(int num_row, int num_col);
-complex<double> SCALARSIGN(complex<double> inputval);
-complex<double> SCALARP(complex<double> vec_in1[],complex<double> vec_in2[],int size_vec);
-complex<double>* SOLVELSP(complex<double>** A, complex<double>* b, int sizeA);
-//void SOLVELSP(complex<double>** A, complex<double>* b, int sizeA, complex<double>* x);
-
-int gmres(int size_vecRHS,complex<double> vec_RHS[],int itermax,double soltolerance,complex<double> vec_sol[], int pc_in){
-
-    int n = size_vecRHS;
-    int flag;
-    int imin=0;
-    int jmin=0;
-    int evalxm=0;
-    int stag=0;
-    int moresteps=0;
-    int maxmsteps=itermax;
-    int maxstagsteps=3;
-    int minupdated=0;
-    double relres;
-    double resvec[itermax+1];
-    double normr=0.0;
-    double normr_act=0.0;
-    double normrmin;
-    double normU=0.0;
-    double normv=0.0;
-    double normUhouse=0.0;
-    double rho=0.0;
-    complex<double> alpha;
-    complex<double>** Jgrot;
-    complex<double>** Ugrot;
-    complex<double>** Rgrot;
-    complex<double>* wgrot;
-    complex<double>* Uhouse=new complex<double>[n];
-    complex<double>* v=new complex<double>[n];
-    complex<double>* vec_mvm=new complex<double>[n];
-    complex<double>* r=new complex<double>[n];
-    complex<double>* additive=new complex<double>[n];
-
-    complex<double> beta;
-    complex<double> dummyconj;
-    complex<double> tmpv;
-    complex<double> val_product;
-    complex<double>*vec_temp;
-    //complex<double>* ytmp=new complex<double> [itermax];
-    //cleartozero(vec_mvm,n);
-    //cleartozero(r,n);
-
-
-    int maxit = itermax;
-    if (itermax>n) maxit = n;
-    int inner= maxit;
-
-    // Check for all zero right hand side vector => all zero solution
-    double n2b = LANORM(vec_RHS,n);
-    if(n2b==0.0){
-        for(int ind1=0; ind1<n; ind1++){
-            vec_sol[ind1]=complex<double>(0.0, 0.0);
-        }
-        flag=0;
-        relres=0.0;
-        resvec[0]=0.0;
-        return 1;
-    }
-    double tolb = soltolerance*n2b;
-
-    //mvm(vec_sol,vec_mvm);
-    for(int i=0; i<n; i++)
-        vec_mvm[i]=complex<double>(0.0, 0.0);
-        
-    if (pc_in==0){mvm(vec_sol,vec_mvm);}
-    if (pc_in==1){mvm_in(vec_sol,vec_mvm);}
-    if (pc_in==2){mvm_Zneardotx(vec_sol,vec_mvm);}
-
-    for(int i=0; i<n; i++)
-        r[i]=vec_RHS[i]-vec_mvm[i];
-
-    normr = LANORM(r,n);
-
-    if(normr<=tolb){
-        //printf("GMRES LOCATION FOR THIS ERROR: 1\n");
-        return 0;
-    }
-    resvec[0]=normr;
-    normrmin=normr;
-
-    //Allocate J to hold the Given's rotation constants
-    Jgrot=constructor2D(2, inner);
-    Ugrot=constructor2D(inner+1, n); // switched the dimensions
-    Rgrot=constructor2D(inner, inner);
-    wgrot=new complex<double>[inner+1];
-    //cleartozero(wgrot,(inner+1));
-    
-    for(int i=0; i<n; i++)
-        Uhouse[i]=r[i];
-    
-    beta = SCALARSIGN(r[0])*normr; 
-    Uhouse[0]+=beta;
-    normU = LANORM(Uhouse,n);
-
-    for(int i=0; i<n; i++){
-        Uhouse[i]/=normU;
-        Ugrot[0][i]=Uhouse[i];
-    }
-    wgrot[0] = -beta;
-
-    for(int initer=0; initer<inner; initer++){
-        dummyconj=conj(Uhouse[initer]);
-        for(int ind1=0; ind1<n; ind1++)
-            v[ind1]=-2.0*dummyconj*Uhouse[ind1];
-        v[initer]+=complex<double>(1.0, 0.0);
-
-        for(int k=(initer-1); k>=0; k--){
-            vec_temp=&Ugrot[k][0];
-            val_product=2.0*SCALARP(vec_temp,v,n);
-            for(int ind1=0; ind1<n; ind1++){
-                v[ind1]-=val_product*Ugrot[k][ind1];
+KrylovResult gmres_solve(int n, Complex* b, int maxit, double tolerance,
+                        Complex* x, int pc_in, bool verbose) {
+    if (pc_in < 0 || pc_in > 2 || !valid_input(n, b, maxit, tolerance, x)) return {};
+    if (!finite(b, n) || !finite(x, n)) { KrylovResult r; r.status = KrylovStatus::NonFinite; return r; }
+    KrylovResult saved;
+    try {
+        // Preserve IBC operator selectors: accurate, approximate, near-only.
+        const Operator op = pc_in == 0 ? mvm : (pc_in == 1 ? mvm_in : mvm_Zneardotx);
+        Context ctx(n, b, x, op, tolerance);
+        if (!std::isfinite(ctx.rhs_norm) || !ctx.check(x)) return ctx.finish(KrylovStatus::NonFinite);
+        if (ctx.converged()) return ctx.finish(KrylovStatus::Converged);
+        if (maxit == 0) return ctx.finish(KrylovStatus::IterationLimit);
+        saved = ctx.result;
+        const int m = std::min(maxit, n);
+        Vector q(storage_size(std::size_t(m)+1, n)), h(storage_size(m, m)), g(std::size_t(m)+1);
+        // The extra slot is the zero subdiagonal at the final dimension.
+        Vector v(std::size_t(n)+1), product(n), correction(n), candidate(n), base(x, x+n), y;
+        std::vector<Rotation> rotations(m);
+        reflector(ctx.residual.data(), q.data(), 0, n, ctx.result.residual_norm);
+        g[0] = -phase(ctx.residual[0])*ctx.result.residual_norm;
+        for (int j = 0; j < m; ++j) {
+            const Complex* qj = q.data()+std::size_t(j)*n;
+            for (int k = 0; k < n; ++k) v[k] = -2.0*std::conj(qj[j])*qj[k];
+            v[j] += 1.0;
+            for (int k = j-1; k >= 0; --k) reflect(q.data()+std::size_t(k)*n, v.data(), n);
+            const double vnorm = krylov_norm(v.data(), n);
+            if (!std::isfinite(vnorm) || vnorm == 0.0) return ctx.finish(KrylovStatus::Breakdown);
+            for (int k = 0; k < n; ++k) v[k] /= vnorm;
+            if (!ctx.product(v.data(), product.data())) return ctx.finish(KrylovStatus::NonFinite);
+            const double before = krylov_norm(product.data(), n);
+            std::copy(product.begin(), product.end(), v.begin());
+            v[n] = 0.0;
+            for (int k = 0; k <= j; ++k) reflect(q.data()+std::size_t(k)*n, v.data(), n);
+            const double tail = krylov_norm(v.data()+j+1, n-j-1);
+            if (!std::isfinite(before) || !std::isfinite(tail) || !finite(v.data(), n))
+                return ctx.finish(KrylovStatus::NonFinite);
+            const bool breakdown = j+1 == n || tail <= 16.0*std::numeric_limits<double>::epsilon()*before;
+            if (!breakdown) {
+                reflector(v.data(), q.data()+std::size_t(j+1)*n, j+1, n, tail);
+                v[j+1] = -phase(v[j+1])*tail;
+                std::fill(v.begin()+j+2, v.end(), Complex{});
+            } else {
+                std::fill(v.begin()+j+1, v.end(), Complex{});
             }
-        }
-        normv = LANORM(v,n);
-
-        for(int ind1=0; ind1<n; ind1++){
-            v[ind1]/=normv;
-        }
-
-        //cleartozero(vec_mvm,n);
-        //mvm(v,vec_mvm);
-        for(int i=0; i<n; i++)
-            vec_mvm[i]=complex<double>(0.0, 0.0);
-            
-        if (pc_in==0){mvm(v,vec_mvm);}
-        if (pc_in==1){mvm_in(v,vec_mvm);}
-        if (pc_in==2){mvm_Zneardotx(v,vec_mvm);}
-
-        for(int ind1=0; ind1<n; ind1++){
-            v[ind1]=vec_mvm[ind1];
-        }
-
-        // Form Pj*Pj-1*...P1*Av.
-        for(int k=0; k<=initer; k++){
-            vec_temp=&Ugrot[k][0];
-            val_product=2.0*SCALARP(vec_temp,v,n);
-            for(int ind1=0; ind1<n; ind1++){
-                v[ind1]-=val_product*Ugrot[k][ind1];
-            }
-        }
-
-        //Determine Pj+1
-        if(initer!=n){
-            for(int ind1=0; ind1<n; ind1++)
-                Uhouse[ind1]=v[ind1];
-            for(int ind1=0; ind1<=initer; ind1++)
-                Uhouse[ind1]=complex<double>(0.0, 0.0);
-            normUhouse=LANORM(Uhouse,n);
-            
-            if(normUhouse!=0.0){
-                alpha=SCALARSIGN(v[initer+1])*normUhouse;
-                Uhouse[initer+1]=Uhouse[initer+1]+alpha;
-                normU=LANORM(Uhouse,n);
-
-                for(int i=0;i<n;i++)
-                    Uhouse[i]/=normU;
-                for(int i=0;i<n;i++)
-                    Ugrot[initer+1][i]=Uhouse[i];
-                for(int i=initer+2;i<n;i++)
-                    v[i]=complex<double>(0.0, 0.0);
-                v[initer+1]=-alpha;
-            }
-        }
-
-        //Apply Given's rotations to the newly formed v.
-        for(int colJ=0; colJ<=(initer-1); colJ++){
-            tmpv=v[colJ];
-            v[colJ]=conj(Jgrot[0][colJ])*tmpv+conj(Jgrot[1][colJ])*v[colJ+1];
-            v[colJ+1]=-Jgrot[1][colJ]*tmpv+Jgrot[0][colJ]*v[colJ+1];
-        }
-
-        //Compute Given's rotation Jm
-        if(initer!=n){
-            rho=LANORM(&v[initer],2); 
-            Jgrot[0][initer]=v[initer]/rho;
-            Jgrot[1][initer]=v[initer+1]/rho;
-            wgrot[initer+1]=-Jgrot[1][initer]*wgrot[initer];
-            wgrot[initer]=conj(Jgrot[0][initer])*wgrot[initer];
-            v[initer]=rho;
-            v[initer+1]=complex<double>(0.0, 0.0);
-        }
-
-        for(int i=0; i<=initer; i++)
-            Rgrot[i][initer]=v[i];
-        normr=abs(wgrot[initer+1]);
-        resvec[initer+1]=normr;
-        normr_act=normr;
-        if (pc_in==0) printf("GMRES-Iter.: %d, Res. Error: %1.3e\n", initer,normr/resvec[0]);std::cout.flush();
-        
-
-        if((normr<=tolb)||(initer==(inner-1))){
-
-            complex<double>* ytmp=SOLVELSP(Rgrot,wgrot,initer);
-            for(int i=0;i<n;i++)
-                additive[i]=Ugrot[initer][i]*(-2.0*ytmp[initer]*conj(Ugrot[initer][initer]));
-            additive[initer]+=ytmp[initer];
-    
-            for(int k=(initer-1); k>=0; k--){
-                additive[k]+=ytmp[k];
-                vec_temp=&Ugrot[k][0];
-                val_product=2.0*SCALARP(vec_temp,additive,n);
-                for(int i=0; i<n; i++){
-                    additive[i]-=Ugrot[k][i]*val_product;
+            for (int k = 0; k < j; ++k) rotations[k].apply(v[k], v[k+1]);
+            if (!rotations[j].make(v[j], v[j+1])) return ctx.finish(KrylovStatus::NonFinite);
+            rotations[j].apply(v[j], v[j+1]);
+            rotations[j].apply(g[j], g[j+1]);
+            for (int k = 0; k <= j; ++k) h[std::size_t(k)*m+j] = v[k];
+            if (!finite(v.data(), n+std::size_t(1)) || !finite(g.data(), g.size()))
+                return ctx.finish(KrylovStatus::NonFinite);
+            ++ctx.result.iterations;
+            const double estimate = std::abs(g[j+1])/(ctx.rhs_norm == 0.0 ? 1.0 : ctx.rhs_norm);
+            if (verbose) std::printf("GMRES-Iter.: %d, estimated relative residual: %.6e\n", ctx.result.iterations, estimate);
+            if (estimate <= tolerance || breakdown || j+1 == m) {
+                int usable = j+1;
+                while (usable > 0) {
+                    const KrylovStatus solve_status = triangular(h, m, g, usable, y);
+                    if (solve_status == KrylovStatus::Converged) break;
+                    if (solve_status == KrylovStatus::NonFinite) return ctx.finish(solve_status);
+                    --usable;
                 }
+                if (usable == 0) return ctx.finish(KrylovStatus::Breakdown);
+                std::fill(correction.begin(), correction.end(), Complex{});
+                // Reconstruct the Householder basis combination without storing a second basis.
+                for (int k = usable-1; k >= 0; --k) {
+                    correction[k] += y[k];
+                    reflect(q.data()+std::size_t(k)*n, correction.data(), n);
+                }
+                for (int k = 0; k < n; ++k) candidate[k] = base[k]+correction[k];
+                const double previous_norm = ctx.result.residual_norm;
+                const double previous_relative = ctx.result.relative_residual;
+                if (!ctx.check(candidate.data())) return ctx.finish(KrylovStatus::NonFinite);
+                if (ctx.result.residual_norm <= previous_norm) {
+                    std::copy(candidate.begin(), candidate.end(), x);
+                    saved = ctx.result;
+                } else {
+                    ctx.result.residual_norm = previous_norm;
+                    ctx.result.relative_residual = previous_relative;
+                }
+                if (ctx.converged()) return ctx.finish(KrylovStatus::Converged);
+                if (breakdown || usable != j+1) return ctx.finish(KrylovStatus::Breakdown);
+                // A small recurrence estimate is insufficient: continue if the true residual fails.
             }
-            for(int i=0; i<n; i++){
-                vec_sol[i]+=additive[i];
-            }
-            
-
-            if (pc_in!=0) printf("GMRES-IN-Iter.: %d, Res. Error: %1.3e\n", initer,normr/resvec[0]);
-
-            destructor2D(Jgrot, 2, inner);
-            destructor2D(Ugrot, inner+1, n);
-            destructor2D(Rgrot, inner, inner);
-            delete[] wgrot;
-            delete[] Uhouse;
-            delete[] v;
-            delete[] vec_mvm;
-            delete[] r;
-            delete[] additive;
-            delete[] ytmp;
-
-            return 0;
         }
-        
+        return ctx.finish(KrylovStatus::IterationLimit);
+    } catch (const std::bad_alloc&) {
+        saved.status = KrylovStatus::AllocationFailure; return saved;
+    } catch (const std::length_error&) {
+        saved.status = KrylovStatus::AllocationFailure; return saved;
     }
-    
-
-    std::cout.flush();
-    return 1;
 }
 
-
-double LANORM(complex<double> vec_in[],int size_vec){
-    // 2-norm of a 1-D complex array "vec_in" with size "size_vec"
-    double val_norm = 0.0;
-    complex<double> val_in;
-    for(int i=0; i<size_vec; i++){
-        val_in=vec_in[i];
-        val_norm += val_in.real()*val_in.real() + val_in.imag()*val_in.imag();
-    }
-
-    val_norm=sqrt(val_norm);
-    return val_norm;
-}
-
-void cleartozero(complex<double> vec_in[],int size_vec){
-    // Set the values of a 1-D complex array "vec_in" with size "size_vec" to zero
-    for(int i=0; i<size_vec; i++)
-        vec_in[i]=complex<double>(0.0, 0.0);
-
-}
-
-complex<double> ** constructor2D(int num_row, int num_col){
-    complex<double> **data_in = new complex<double>*[num_row];
-    for(int i=0; i<num_row; i++){
-        data_in[i]=new complex<double>[num_col];
-    }
-
-    for(int i=0; i<num_row; i++){
-        for(int j=0; j<num_col; j++)
-            data_in[i][j]=complex<double>(0.0, 0.0);
-    }
-
-    return data_in;
-}
-
-void destructor2D(complex<double> **data_in, int num_row, int num_col){
-    for(int i=0; i<num_row; i++){
-        delete[] data_in[i];
-    }
-    delete[] data_in;
-}
-
-complex<double> SCALARSIGN(complex<double> inputval){
-    complex<double> signofinput;
-    if(abs(inputval)==0.0){
-        signofinput=complex<double>(1.0, 0.0);
-    } else {
-        signofinput=inputval/abs(inputval);
-    }
-    return signofinput;
-}
-
-complex<double> SCALARP(complex<double>* vec_in1,complex<double>* vec_in2,int size_vec){
-    complex<double> multiplication=complex<double>(0.0, 0.0);
-    for(int i=0; i<size_vec; i++){
-        multiplication+=conj(vec_in1[i])*vec_in2[i];
-    }
-    return multiplication;
-}
-
-
-complex<double>* SOLVELSP(complex<double>** A, complex<double>* b, int sizeA){
-    complex<double>* x=new complex<double>[sizeA+1];
-    for(int i=(sizeA); i>=0; i--){
-        for(int j=(sizeA); j>=(i+1); j--){
-            b[i]-=A[i][j]*x[j];
-        }
-        x[i]=b[i]/A[i][i];
-    }
-    return x;
+int gmres(int n, Complex* b, int maxit, double tolerance, Complex* x, int pc_in) {
+    return static_cast<int>(gmres_solve(n, b, maxit, tolerance, x, pc_in, pc_in == 0).status);
 }

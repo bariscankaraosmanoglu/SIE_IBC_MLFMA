@@ -1,6 +1,9 @@
 #include "calculate_translationoperator.h"
+#include "mlfma_workspace.h"
+#include <iostream>
 
 void calculate_translationoperator(){
+    auto& workspace = mlfma_workspace();
     //
     //
     // calculate_translationoperator
@@ -12,14 +15,6 @@ void calculate_translationoperator(){
     double hankelarg=0;
     double legendrearg=0;
     complex<double> val_i=complex<double>(0.0, 1.0);
-    double *thetalocations;
-    double *thetaweights;
-    double *philocations;
-    double *phiweights;
-    double *sintheta;
-    double *costheta;
-    double *sinphi;
-    double *cosphi;
     double khat[3]{0.0, 0.0, 0.0};
     complex<double> *hankelvalue;
     double *legendrevalue;
@@ -39,17 +34,13 @@ void calculate_translationoperator(){
         int numberofthetas=numberofterms+1;
         int numberofphis=numberofthetas*2;
 
-        thetalocations=new double[numberofthetas];
-        thetaweights=new double[numberofthetas];
-        philocations=new double[numberofphis];
-        phiweights=new double[numberofphis];
-        sintheta=new double[numberofthetas];
-        costheta=new double[numberofthetas];
-        sinphi=new double[numberofphis];
-        cosphi=new double[numberofphis];
-        theta_locations_weights(numberofthetas, thetaweights, thetalocations);
-        phi_locations_weights(numberofphis, phiweights, philocations);
-        calculate_sin_cos(numberofthetas,numberofphis, thetalocations, philocations, sintheta, costheta, sinphi, cosphi);
+        const auto& grid = workspace.grid(numberofthetas,numberofphis);
+        const double* thetaweights = grid.theta_weights.data();
+        const double* phiweights = grid.phi_weights.data();
+        const double* sintheta = grid.sin_theta.data();
+        const double* costheta = grid.cos_theta.data();
+        const double* sinphi = grid.sin_phi.data();
+        const double* cosphi = grid.cos_phi.data();
 
         omp_set_num_threads(num_threads);
         #pragma omp parallel if(parallel_omp_on)
@@ -86,7 +77,7 @@ void calculate_translationoperator(){
                             khat[2]=costheta[indtheta];
                             legendrearg=(translationvector[0]*khat[0]+translationvector[1]*khat[1]+translationvector[2]*khat[2])/translationvectorsize;
                             legendrevalue[0]=1.0;
-                            legendrevalue[1]=legendrearg;
+                            if (numberofterms >= 1) legendrevalue[1]=legendrearg;
                             for(int indterm=2; indterm<(numberofterms+1); indterm++){
                                 legendrevalue[indterm]=((2*indterm-1)*legendrearg*legendrevalue[indterm-1] - (indterm-1)*legendrevalue[indterm-2])/indterm;
     //                                    legendrevalue[indterm]=legendrel(indterm,legendrearg);
@@ -106,14 +97,6 @@ void calculate_translationoperator(){
             double timer_end = omp_get_wtime();
 //            fprintf(file_timer,"Trans%d %d %1.5f %1.5f \n", indlev, omp_get_thread_num(), timer_end-timer_start, timer_total);
         }
-        delete[] thetalocations;
-        delete[] thetaweights;
-        delete[] philocations;
-        delete[] phiweights;
-        delete[] sintheta;
-        delete[] costheta;
-        delete[] sinphi;
-        delete[] cosphi;
 
     }
     printf("Translation Operator Size: %d  [%f GB]\n", size_trans, size_trans*16.0/1024.0/1024/1024);
@@ -133,24 +116,15 @@ void calculate_translationoperator(){
             int numberofthetas=numberofterms+1;
             int numberofphis=numberofthetas*2;
 
-            thetalocations=new double[numberofthetas];
-            thetaweights=new double[numberofthetas];
-            philocations=new double[numberofphis];
-            phiweights=new double[numberofphis];
-            sintheta=new double[numberofthetas];
-            costheta=new double[numberofthetas];
-            sinphi=new double[numberofphis];
-            cosphi=new double[numberofphis];
-            theta_locations_weights(numberofthetas, thetaweights, thetalocations);
-            phi_locations_weights(numberofphis, phiweights, philocations);
-            calculate_sin_cos(numberofthetas,numberofphis, thetalocations, philocations, sintheta, costheta, sinphi, cosphi);
+            const auto& grid = workspace.grid(numberofthetas,numberofphis);
+            const double* thetaweights = grid.theta_weights.data();
+            const double* phiweights = grid.phi_weights.data();
+            const double* sintheta = grid.sin_theta.data();
+            const double* costheta = grid.cos_theta.data();
+            const double* sinphi = grid.sin_phi.data();
+            const double* cosphi = grid.cos_phi.data();
 
-            hankelvalue=new complex<double>[numberofterms+1];
-            legendrevalue=new double[numberofterms+1];
-            for(int ind=0; ind<(numberofterms+1); ind++){
-                legendrevalue[ind]=0.0;
-                hankelvalue[ind]=complex<double>(0.0, 0.0);
-            }
+            // Each worker owns the temporary arrays allocated in its loop below.
 
             omp_set_num_threads(num_threads);
             #pragma omp parallel if(parallel_omp_on)
@@ -188,7 +162,7 @@ void calculate_translationoperator(){
                                 khat[2]=costheta[indtheta];
                                 legendrearg=(translationvector[0]*khat[0]+translationvector[1]*khat[1]+translationvector[2]*khat[2])/translationvectorsize;
                                 legendrevalue[0]=1.0;
-                                legendrevalue[1]=legendrearg;
+                                if (numberofterms >= 1) legendrevalue[1]=legendrearg;
                                 for(int indterm=2; indterm<(numberofterms+1); indterm++){
                                     legendrevalue[indterm]=((2*indterm-1)*legendrearg*legendrevalue[indterm-1] - (indterm-1)*legendrevalue[indterm-2])/indterm;
     //                                    legendrevalue[indterm]=legendrel(indterm,legendrearg);
@@ -208,14 +182,6 @@ void calculate_translationoperator(){
                 double timer_end = omp_get_wtime();
 //                fprintf(file_timer,"TransPC%d %d %1.5f %1.5f\n", indlev, omp_get_thread_num(), timer_end-timer_start, timer_total);
             }
-            delete[] thetalocations;
-            delete[] thetaweights;
-            delete[] philocations;
-            delete[] phiweights;
-            delete[] sintheta;
-            delete[] costheta;
-            delete[] sinphi;
-            delete[] cosphi;
         }
 //        printf("PC Translation Operator Size: %d  [%f GB]\n", size_trans_pc, size_trans_pc*16.0/1024.0/1024/1024);
     }
@@ -225,7 +191,7 @@ void calculate_translationoperator(){
     printf("Translation Operator Calculation Takes %f s \n", time_span.count());
 //    fclose(file_timer);
 
-
     std::cout.flush();
+
 }
 

@@ -1,6 +1,10 @@
 #include "generate_Znearcomponent.h"
+#include "input_validation.h"
+#include <climits>
+#include <vector>
 
 void generate_Znearcomponent(){
+    try {
     //
     //
     // generate_Znearcomponent
@@ -20,7 +24,8 @@ void generate_Znearcomponent(){
             if(boxes_near[box_test*27+ind_nearbox]!=-1){
                 int box_basis=boxes_near[box_test*27+ind_nearbox];
                 nearindex[(box_test-startbox)*27+ind_nearbox]=size_Znear;
-                size_Znear+=num_children[box_test]*num_children[box_basis];
+                const long block=checked_index_product(num_children[box_test],num_children[box_basis],INT_MAX,"near matrix");
+                size_Znear=checked_index_sum(size_Znear,block,INT_MAX,"near matrix");
             }
         }
     }
@@ -47,7 +52,8 @@ void generate_Znearcomponent(){
     ind_rwg=0;
     val_maxtri=0;
     int ind_newtriinbox=0;
-    int boxtri[maxrwgsperbox*2+1];
+    std::vector<int> boxtri_storage(size_t(maxrwgsperbox)*2+1);
+    int* boxtri=boxtri_storage.data();
     // Calculating the maximum number of triangles in boxes for allocation of "smallestbox2tri"
     for(int ind_box=startbox; ind_box<endbox; ind_box++){
         for(int ind_tri=0; ind_tri<(maxrwgsperbox*2+1); ind_tri++){
@@ -76,6 +82,7 @@ void generate_Znearcomponent(){
 
     ind_rwg=0;
     ind_newtriinbox=0;
+    checked_index_product(num_leastlevelbox,val_maxtri,INT_MAX,"triangle-to-box indices");
     smallestbox2tri=new int[num_leastlevelbox*val_maxtri];
     for(int indtri=0; indtri<(num_leastlevelbox*val_maxtri); indtri++)
         smallestbox2tri[indtri]=-1;
@@ -101,6 +108,8 @@ void generate_Znearcomponent(){
             }
         }
     }
+    } catch (const InputError& error) { report_input_error(error); }
+      catch (const std::bad_alloc&) { report_input_error(InputError("near matrix","unable to allocate index storage")); }
 }
 
 int compareint (const void * a, const void * b)

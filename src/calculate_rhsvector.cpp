@@ -1,3 +1,4 @@
+#include "solver_globals.h"
 #include <stdio.h>
 #include <complex>
 #include <chrono>
@@ -9,14 +10,12 @@ using namespace std::chrono;
 
 extern double pi;
 extern double val_etaO;
-extern double val_cfiealpha;
 extern double val_kO;
 extern int source_type;
 extern complex<double> *source_CSP;
 extern complex<double> *source_current;
 extern complex<double> *source_DG;
 extern double *source_dipole;
-extern double *source_PW;
 extern double val_epsilonO;
 extern double *vec_trinormals;
 extern double val_muO;
@@ -61,7 +60,7 @@ void calculate_rhsvector(double dir_PW[]){
         vec_RHS[ind0]=complex0;
     }
 
-    printf("RHS Vector Size: %d  [%f GB]\n", num_rwgs, num_rwgs*16.0/1024.0/1024/1024);
+    printf("RHS Vector Size: %d  [%f GB]\n", 2*num_rwgs, 2*num_rwgs*16.0/1024.0/1024/1024);
 
     //RHS vector for plane wave illumination
     if(source_type==0){

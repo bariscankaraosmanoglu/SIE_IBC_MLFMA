@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Bariscan Karaosmanoglu, PhD
+// SPDX-License-Identifier: MIT
+
 #include "main.h"
 
 int main()
@@ -13,13 +16,11 @@ int main()
     calculate_loadbalance();
     calculate_Znearmatrix();
     calculate_translationoperator();
-    calculate_blockdiagonalpreconditioner();
+    if (val_pc == 1) calculate_blockdiagonalpreconditioner();
 
-    stage_solution();
+    const int solution_status = stage_solution();
     stage_aftersolution();
     clear_memory();
 
-
-
-    return 0;
+    return solution_status;
 }

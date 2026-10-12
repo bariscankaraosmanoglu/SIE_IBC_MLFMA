@@ -1,55 +1,25 @@
-#include <stdio.h>
-#include <complex>
-#include <chrono>
+#include "krylov.h"
+#include <algorithm>
+#include <cstdio>
+#include <limits>
 
 using namespace std;
-using namespace std::chrono;
-
-extern int num_rwgs;
 extern int val_pc;
 extern int val_itermax_pc;
 
-int fgmres_in(int size_vecRHS,complex<double> vec_RHS[],int itermax,int iterrestart,double soltolerance,complex<double> vec_sol[]);
-int gmres(int size_vecRHS,complex<double> vec_RHS_i[],int itermax,double soltolerance,complex<double> vec_sol_i[], int pc_in);
-
-void pc_solution(complex<double> vec_RHS_i[], complex<double> vec_sol_i[], int size_vecRHS){
-
-
-    int itermax=val_itermax_pc;
-    int iterrestart=val_itermax_pc;
-    double soltolerance=0.5;
-
-    for(int ind0=0;ind0<size_vecRHS;ind0++){
-        vec_sol_i[ind0]=complex<double>(0.0, 0.0);
+void pc_solution(complex<double>* b, complex<double>* x, int n) {
+    if (val_pc != 2) {
+        copy_n(b, n, x);
+        return;
     }
-
-    high_resolution_clock::time_point t1 = high_resolution_clock::now();
-
-    fgmres_in(size_vecRHS,vec_RHS_i,itermax,iterrestart,soltolerance,vec_sol_i);
-    //stat_solution++; // for nothing
-
-    //gmres(size_vecRHS,vec_RHS_i,itermax,soltolerance,vec_sol_i,1);
-
-    high_resolution_clock::time_point t2 = high_resolution_clock::now();
-    duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
-//    printf("Preconditioner Part Takes %f s \n", time_span.count());
-
-
-
+    fill_n(x, n, complex<double>{});
+    // Preserve the IBC nesting and its original inner tolerance: approximate
+    // FGMRES, itself preconditioned by near-only GMRES in pc_solution_in().
+    const KrylovResult result = fgmres_in_solve(n,b,val_itermax_pc,val_itermax_pc,0.5,x);
+    if (result.status == KrylovStatus::Converged || result.status == KrylovStatus::IterationLimit) return;
+    fprintf(stderr, "Inner FGMRES failed: %s, iterations=%d, true relative residual=%.6e\n",
+            krylov_status_name(result.status), result.iterations, result.relative_residual);
+    // The callback cannot return a status. The outer solver detects this marker
+    // before applying its operator and retains its last checked finite iterate.
+    fill_n(x, n, complex<double>{numeric_limits<double>::quiet_NaN(), 0.0});
 }
-
-
-
-//#include <stdio.h>
-//#include <complex>
-//
-//using namespace std;
-//
-//void pc_solution(complex<double> vec_RHS_i[], complex<double> vec_sol_i[], int size_vecRHS){
-//
-//    for(int ind=0;ind<size_vecRHS;ind++){
-//        vec_sol_i[ind]=vec_RHS_i[ind];
-//    }
-//
-//}
-

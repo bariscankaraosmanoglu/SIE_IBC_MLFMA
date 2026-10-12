@@ -1,6 +1,8 @@
 #include "generate_edgeconnection.h"
+#include "surface_components.h"
 
 void generate_edgeconnection(){
+    generate_surface_components();
     //
     //
     // generate_edgeconnection
@@ -143,7 +145,7 @@ void generate_edgeconnection(){
             }
         }
     }
-    delete[] nodetrisindex;
+    delete[] nodetrisindex; nodetrisindex=nullptr;
     delete[] nodetris;
     delete[] num_trispernode;
 
@@ -224,6 +226,5 @@ void generate_edgeconnection(){
     printf("\n");
 
     std::cout.flush();
-
 
 }

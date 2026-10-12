@@ -1,3 +1,4 @@
+#include "calculate_loadbalance.h"
 #include "calculate_Znearmatrix.h"
 
 void calculate_Znearmatrix(){
@@ -48,7 +49,7 @@ void calculate_Znearmatrix(){
 
 
     t1 = high_resolution_clock::now();
-    for(int ind0=0;ind0<size_Znear;ind0++){
+    for(long int ind0=0;ind0<size_Znear;ind0++){
         matrix_Znear11[ind0]=complex0;
         matrix_Znear12[ind0]=complex0;
         matrix_Znear21[ind0]=complex0;
@@ -73,13 +74,13 @@ void calculate_Znearmatrix(){
                                  
     {
         #pragma omp barrier
-        int tid=omp_get_thread_num();
+        const auto box_range=near_box_range(omp_get_thread_num(),omp_get_num_threads());
         double timer_start = omp_get_wtime();
         double timer_total = 0.0;
-        complex<double> val_imp = (0.0, 0.0);
+        complex<double> val_imp{};
 
 //        for(int box_test=box_start;box_test<box_end;box_test++){
-        for(int box_test=thread_boxes[tid*2+0];box_test<thread_boxes[tid*2+1];box_test++){
+        for(int box_test=box_range.first;box_test<box_range.second;box_test++){
             double timer_in = omp_get_wtime();
             for(int ind_nearbox=0;ind_nearbox<27;ind_nearbox++){
                 if(boxes_near[box_test*27+ind_nearbox]!=-1){
@@ -107,8 +108,8 @@ void calculate_Znearmatrix(){
                             testlocation[2]=(testnode1loc[2]+testnode2loc[2]+testnode3loc[2])/3;
                             for(int indbasistri=0;indbasistri<val_maxtri;indbasistri++){
                                 basistri=smallestbox2tri[(box_basis-box_start)*val_maxtri+indbasistri];
-                                val_imp = val_impedance[tri_media[basistri]];
                                 if(basistri!=-1){
+                                    val_imp = val_impedance[tri_media[basistri]];
                                     basisnode1=tri_nodes[basistri*3+0];
                                     basisnode2=tri_nodes[basistri*3+1];
                                     basisnode3=tri_nodes[basistri*3+2];
